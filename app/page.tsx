@@ -1,16 +1,27 @@
 'use client';
 
 import { useState } from 'react';
-import { GraduationCap } from 'lucide-react';
+import { AlertCircle, ArrowLeft, GraduationCap } from 'lucide-react';
 import { SearchForm } from '@/components/search-form';
 import { StudentResult } from '@/components/student-result';
 import { NotFoundResult } from '@/components/not-found-result';
-import { findStudent, type Student } from '@/lib/sample-data';
+import { Button } from '@/components/ui/button';
+import type { Student } from '@/lib/sample-data';
 
 type ViewState =
   | { type: 'search' }
   | { type: 'found'; student: Student }
-  | { type: 'not-found'; query: string };
+  | { type: 'not-found'; query: string }
+  | { type: 'error' };
+
+type SearchResponse = Partial<{
+  found: boolean;
+  student: Student;
+  error: string;
+}>;
+
+const TECHNICAL_ERROR_MESSAGE =
+  'No pudimos consultar el estado en este momento. Intentá nuevamente más tarde.';
 
 export default function PortalIngresante() {
   const [viewState, setViewState] = useState<ViewState>({ type: 'search' });
@@ -18,19 +29,39 @@ export default function PortalIngresante() {
 
   const handleSearch = async (query: string) => {
     setIsLoading(true);
-    
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    
-    const student = findStudent(query);
-    
-    if (student) {
-      setViewState({ type: 'found', student });
-    } else {
-      setViewState({ type: 'not-found', query });
+
+    try {
+      const response = await fetch('/api/enrollment/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query }),
+      });
+
+      if (!response.ok) {
+        setViewState({ type: 'error' });
+        return;
+      }
+
+      const result = (await response.json()) as SearchResponse;
+
+      if (result.found === true && result.student) {
+        setViewState({ type: 'found', student: result.student });
+        return;
+      }
+
+      if (result.found === false) {
+        setViewState({ type: 'not-found', query });
+        return;
+      }
+
+      setViewState({ type: 'error' });
+    } catch {
+      setViewState({ type: 'error' });
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   const handleBack = () => {
@@ -90,6 +121,31 @@ export default function PortalIngresante() {
 
         {viewState.type === 'not-found' && (
           <NotFoundResult query={viewState.query} onBack={handleBack} />
+        )}
+
+        {viewState.type === 'error' && (
+          <div className="space-y-5">
+            <Button
+              variant="ghost"
+              onClick={handleBack}
+              className="h-auto p-0 text-muted-foreground hover:text-foreground"
+            >
+              <ArrowLeft className="mr-1 h-4 w-4" />
+              Volver a buscar
+            </Button>
+
+            <div className="rounded-xl bg-card p-6 text-center shadow-sm">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+                <AlertCircle className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h2 className="mb-2 text-lg font-semibold text-foreground">
+                No pudimos realizar la consulta
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {TECHNICAL_ERROR_MESSAGE}
+              </p>
+            </div>
+          </div>
         )}
       </div>
 
