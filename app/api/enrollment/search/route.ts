@@ -47,11 +47,7 @@ function asString(value: unknown): string | undefined {
 }
 
 function normalizeStatus(value: unknown): EnrollmentStatus | undefined {
-  const status = asString(value)
-    ?.toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[\s-]+/g, '_');
+  const status = asString(value);
 
   if (!status || !VALID_STATUSES.has(status as EnrollmentStatus)) {
     return undefined;
